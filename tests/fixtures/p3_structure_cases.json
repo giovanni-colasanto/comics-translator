@@ -1,0 +1,490 @@
+{
+  "scope": "Geometrie e testi sintetici portabili: proprieta' e ordine, non riconoscimento semantico.",
+  "limits": "Contorni forniti come evidenza simulata, non rilevati da immagini. Categorie gold non predette. Nessun adattamento o traduzione reale.",
+  "cases": [
+    {
+      "name": "due_lobi_verticali",
+      "category": "dialogo_multilobo",
+      "rows": [
+        [
+          20,
+          20,
+          60,
+          30
+        ],
+        [
+          20,
+          70,
+          60,
+          80
+        ]
+      ],
+      "regions": [
+        [
+          0,
+          1
+        ]
+      ],
+      "contours": [
+        [
+          [
+            10,
+            10,
+            80,
+            45
+          ],
+          [
+            10,
+            60,
+            80,
+            95
+          ]
+        ]
+      ],
+      "expected": [
+        [
+          0
+        ],
+        [
+          1
+        ]
+      ],
+      "unresolved": []
+    },
+    {
+      "name": "tre_lobi_diagonali",
+      "category": "dialogo_multilobo",
+      "rows": [
+        [
+          20,
+          20,
+          60,
+          30
+        ],
+        [
+          90,
+          70,
+          130,
+          80
+        ],
+        [
+          160,
+          120,
+          200,
+          130
+        ]
+      ],
+      "regions": [
+        [
+          0,
+          1,
+          2
+        ]
+      ],
+      "contours": [
+        [
+          [
+            10,
+            10,
+            75,
+            45
+          ],
+          [
+            80,
+            60,
+            145,
+            95
+          ],
+          [
+            150,
+            110,
+            215,
+            145
+          ]
+        ]
+      ],
+      "expected": [
+        [
+          0
+        ],
+        [
+          1
+        ],
+        [
+          2
+        ]
+      ],
+      "unresolved": []
+    },
+    {
+      "name": "balloon_parlanti_distinti",
+      "category": "balloon_adiacenti",
+      "rows": [
+        [
+          20,
+          20,
+          60,
+          30
+        ],
+        [
+          90,
+          20,
+          130,
+          30
+        ]
+      ],
+      "regions": [
+        [
+          0
+        ],
+        [
+          1
+        ]
+      ],
+      "contours": [
+        [
+          [
+            10,
+            10,
+            75,
+            45
+          ]
+        ],
+        [
+          [
+            80,
+            10,
+            145,
+            45
+          ]
+        ]
+      ],
+      "expected": [
+        [
+          0
+        ],
+        [
+          1
+        ]
+      ],
+      "unresolved": []
+    },
+    {
+      "name": "didascalia_e_balloon",
+      "category": "mista",
+      "rows": [
+        [
+          10,
+          10,
+          80,
+          20
+        ],
+        [
+          100,
+          20,
+          140,
+          30
+        ]
+      ],
+      "regions": [
+        [
+          0
+        ],
+        [
+          1
+        ]
+      ],
+      "contours": [
+        [],
+        [
+          [
+            90,
+            10,
+            155,
+            45
+          ]
+        ]
+      ],
+      "expected": [
+        [
+          0
+        ],
+        [
+          1
+        ]
+      ],
+      "unresolved": []
+    },
+    {
+      "name": "colonne_editoriali",
+      "category": "colonne",
+      "rows": [
+        [
+          10,
+          10,
+          70,
+          20
+        ],
+        [
+          10,
+          30,
+          70,
+          40
+        ],
+        [
+          100,
+          10,
+          160,
+          20
+        ],
+        [
+          100,
+          30,
+          160,
+          40
+        ]
+      ],
+      "regions": [
+        [
+          0,
+          1
+        ],
+        [
+          2,
+          3
+        ]
+      ],
+      "contours": [
+        [],
+        []
+      ],
+      "expected": [
+        [
+          0,
+          1
+        ],
+        [
+          2,
+          3
+        ]
+      ],
+      "unresolved": []
+    },
+    {
+      "name": "titolo_e_crediti",
+      "category": "crediti",
+      "rows": [
+        [
+          10,
+          10,
+          160,
+          20
+        ],
+        [
+          10,
+          40,
+          70,
+          50
+        ],
+        [
+          100,
+          40,
+          160,
+          50
+        ]
+      ],
+      "regions": [
+        [
+          0
+        ],
+        [
+          1
+        ],
+        [
+          2
+        ]
+      ],
+      "contours": [
+        [],
+        [],
+        []
+      ],
+      "expected": [
+        [
+          0
+        ],
+        [
+          1
+        ],
+        [
+          2
+        ]
+      ],
+      "unresolved": []
+    },
+    {
+      "name": "due_no_distinti",
+      "category": "battute_identiche",
+      "texts": [
+        "NO!",
+        "NO!"
+      ],
+      "rows": [
+        [
+          20,
+          20,
+          40,
+          30
+        ],
+        [
+          100,
+          20,
+          120,
+          30
+        ]
+      ],
+      "regions": [
+        [
+          0
+        ],
+        [
+          1
+        ]
+      ],
+      "contours": [
+        [],
+        []
+      ],
+      "expected": [
+        [
+          0
+        ],
+        [
+          1
+        ]
+      ],
+      "unresolved": []
+    },
+    {
+      "name": "contorni_sovrapposti",
+      "category": "ambigua",
+      "rows": [
+        [
+          20,
+          20,
+          40,
+          30
+        ],
+        [
+          70,
+          20,
+          90,
+          30
+        ]
+      ],
+      "regions": [
+        [
+          0,
+          1
+        ]
+      ],
+      "contours": [
+        [
+          [
+            10,
+            10,
+            65,
+            45
+          ],
+          [
+            55,
+            10,
+            100,
+            45
+          ]
+        ]
+      ],
+      "expected": [
+        [],
+        []
+      ],
+      "unresolved": [
+        0,
+        1
+      ]
+    },
+    {
+      "name": "riga_fuori_area",
+      "category": "fuori_area",
+      "rows": [
+        [
+          20,
+          20,
+          100,
+          30
+        ]
+      ],
+      "regions": [
+        [
+          0
+        ]
+      ],
+      "contours": [
+        [
+          [
+            10,
+            10,
+            60,
+            45
+          ]
+        ]
+      ],
+      "expected": [
+        []
+      ],
+      "unresolved": [
+        0
+      ]
+    },
+    {
+      "name": "lobo_senza_righe",
+      "category": "lobo_vuoto",
+      "rows": [
+        [
+          20,
+          20,
+          60,
+          30
+        ]
+      ],
+      "regions": [
+        [
+          0
+        ]
+      ],
+      "contours": [
+        [
+          [
+            10,
+            10,
+            75,
+            45
+          ],
+          [
+            80,
+            60,
+            145,
+            95
+          ]
+        ]
+      ],
+      "expected": [
+        [
+          0
+        ],
+        []
+      ],
+      "unresolved": []
+    }
+  ]
+}

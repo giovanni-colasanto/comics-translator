@@ -1,0 +1,85 @@
+{
+  "nota": "Inventario umano parziale trascritto dai ritagli sorgente il 27 agosto 2026; non gold standard dell'intero documento. I box sono regioni visive in punti PDF.",
+  "riferimenti": [
+    {
+      "sessione": "autonomia-baseline-6p-r1",
+      "sorgente_sha256": "2e6ae35c9254f20f0553e6737663f89b726e57c6c91e5dc620f54eba6d489844",
+      "ambito": "parziale: quattro unita' B00 pagine 3-4",
+      "unita": [
+        {
+          "id": "b00-p3-presidente",
+          "pagina": 3,
+          "box_pt": [
+            330,
+            470,
+            540,
+            518
+          ],
+          "testo": "...AND OBVIOUSLY, SO DO THE PEOPLE ABOVE ME, INCLUDING THE PRESIDENT."
+        },
+        {
+          "id": "b00-p3-doom",
+          "pagina": 3,
+          "box_pt": [
+            440,
+            518,
+            620,
+            628
+          ],
+          "testo": "DOOM'S AN AUTOCRATIC MADMAN, WHO'S BEEN ILLEGALLY ENTERING AMERICA AND THREATENING ITS CITIZENS AFTER HIS COUP IN LATVERIA."
+        },
+        {
+          "id": "b00-p3-able",
+          "pagina": 3,
+          "box_pt": [
+            255,
+            1120,
+            340,
+            1195
+          ],
+          "testo": "BUT HOW ARE YOU ABLE TO--?"
+        },
+        {
+          "id": "b00-p4-information",
+          "pagina": 4,
+          "box_pt": [
+            690,
+            28,
+            850,
+            112
+          ],
+          "testo": "I HAVE INFORMATION-- FACTS AND DETAILS-- BUT WHAT I REALLY NEED TO KNOW IS..."
+        }
+      ]
+    },
+    {
+      "sessione": "post-refactor-codex-5-4-10p-r1",
+      "sorgente_sha256": "66dba187e5ebd79f840a8e590cf985cf1d87945ed3b42e3b2e2c887f1df1ed89",
+      "ambito": "parziale: dialogo omesso e vicino della pagina 4 test10",
+      "unita": [
+        {
+          "id": "test10-p4-army",
+          "pagina": 4,
+          "box_pt": [
+            310,
+            1187,
+            456,
+            1260
+          ],
+          "testo": "BUT FOR ME, IT JUST HAPPENED. YESTERDAY, I WAS A SOLDIER IN THE U.S. ARMY."
+        },
+        {
+          "id": "test10-p4-time",
+          "pagina": 4,
+          "box_pt": [
+            440,
+            1160,
+            515,
+            1210
+          ],
+          "testo": "SO NOW IT'S TIME..."
+        }
+      ]
+    }
+  ]
+}

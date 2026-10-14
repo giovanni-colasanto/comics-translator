@@ -1,0 +1,25 @@
+{
+  "metadata": {
+    "kind": "synthetic",
+    "purpose": "P0: false success, omitted page/block and duplicate identity",
+    "reference": "B00 and post-refactor 10p exposed incomplete QA/coverage; this fixture does not reproduce visual layout",
+    "expected": "Both pages, including the empty one, must be present; every id must be returned exactly once"
+  },
+  "plan": {
+    "motore": "none",
+    "pagine": [
+      {"numero": 1, "indice": 0, "blocchi": [
+        {"id": "p1-a", "originale": "Wait!", "testo": "Wait!", "salta": false},
+        {"id": "p1-b", "originale": "No!", "testo": "No!", "salta": false}
+      ]},
+      {"numero": 2, "indice": 1, "blocchi": []}
+    ]
+  },
+  "response": {"pagine": [
+    {"numero": 1, "blocchi": [
+      {"id": "p1-a", "testo": "Aspetta!", "salta": false},
+      {"id": "p1-b", "testo": "No!", "salta": false}
+    ]},
+    {"numero": 2, "blocchi": []}
+  ]}
+}

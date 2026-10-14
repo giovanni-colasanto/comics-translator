@@ -1,0 +1,45 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "comics-translator"
+dynamic = ["version"]
+description = "Translate comic pages: OCR of the balloons, AI-assisted translation and review, text redrawn on the page."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+authors = [{ name = "GioVanni Colasanto" }]
+keywords = ["comics", "translation", "ocr", "pdf", "ai", "balloons"]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License",
+    "Topic :: Multimedia :: Graphics",
+    "Topic :: Text Processing :: Linguistic",
+]
+dependencies = [
+    "PyMuPDF>=1.24",
+    "numpy>=1.24",
+    # Comic pages are images: OCR is required. Brings onnxruntime and opencv-python.
+    "rapidocr-onnxruntime>=1.4",
+]
+
+[project.optional-dependencies]
+# Restores spaces lost by OCR on all-caps lettering ("HRARGHYOURSELF").
+wordninja = ["wordninja>=2.0"]
+# Machine translation draft engines (--engine deepl | google | libre | argos).
+mt = ["deep-translator>=1.11"]
+argos = ["argostranslate>=1.11"]
+dev = ["pytest>=8"]
+
+[project.scripts]
+comics-translator = "comics_translator.disegno.pdf_translate_overlay:main"
+
+[project.urls]
+Source = "https://github.com/giovanni-colasanto/comics-translator"
+
+[tool.setuptools.dynamic]
+version = { attr = "comics_translator.__version__" }
+
+[tool.setuptools.packages.find]
+include = ["comics_translator*"]
