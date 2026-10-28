@@ -50,9 +50,13 @@ l'originale per verificare il senso e il PDF tradotto per verificare la resa.
 Mantieni le frasi volutamente interrotte nell'originale. Non completarle.
 Non tentare di separare i lobi con sequenze di escape nel testo.
 I blocchi con `salta: true` devono restare tali. Non riattivare gruppi protetti
-e non trasferire il loro testo in blocchi vicini. Se un gruppo unico copre piu'
-lobi e il testo esce dai bordi o lascia un lobo vuoto, usa `salta: true`:
-ridurre il corpo non separa le aree. Non inventare id per testo assente dal piano.
+e non trasferire il loro testo in blocchi vicini. Non mettere `salta: true` su
+un dialogo o una didascalia: lascerebbe l'inglese sulla pagina. Se un gruppo
+unico copre piu' lobi e il testo esce dai bordi o lascia un lobo vuoto,
+riscrivi `testo` con le battute di ogni lobo come frasi separate, nell'ordine
+di lettura: il programma le divide fra i lobi contando le frasi. L'inglese
+rimasto fuori dai blocchi lo ripara una fase successiva: qui non serve
+segnalarlo. Non inventare id per testo assente dal piano.
 Scrivi il testo in UTF-8 con accenti corretti, non apostrofi al posto degli accenti.
 Leggi soltanto il piano e le coppie di immagini di questo lotto.
 

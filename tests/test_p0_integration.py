@@ -57,7 +57,7 @@ class P0IntegrationTest(unittest.TestCase):
         self.assertIn("CIAO", text)
         self.assertEqual(set(report["phases"]),
                          {"analysis", "structure", "translation", "render", "qa",
-                          "structure_audit"})
+                          "riparazione", "structure_audit"})
         self.assertTrue(all(p["status"] == "complete" for p in report["phases"].values()))
 
     def test_l_audit_raster_gira_da_solo_e_lascia_il_rapporto(self):
