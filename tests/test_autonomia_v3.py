@@ -194,6 +194,23 @@ class RiparazioneTest(unittest.TestCase):
         self.assertEqual(len(scartate), 2)
         self.assertEqual(blocco["testo"], "CIAO A TUTTI")
 
+    def test_traduci_residuo_usa_il_riquadro_dell_immagine(self):
+        built, officina, _ = self._officina()
+        scala = officina.scala(1)
+        dpi = 144
+        dati = [riparazione._dati_pagina(
+            officina, 1, [{"testo": "GO AWAY", "box_pt": [v * scala for v in (300, 400, 380, 420)]}],
+            dpi)]
+        spec = {"operazioni": [{"op": "traduci_residuo", "residuo": "p1-r1",
+                                "testo": "VATTENE", "sfondo": "banda"}]}
+        fatte, scartate = riparazione.applica_operazioni(officina, spec, dati, {1: dpi})
+        self.assertEqual(scartate, [])
+        self.assertEqual(len(fatte), 1)
+        riga = built["pagine"][0]["sorgente"]["righe"][-1]
+        # andata e ritorno px del piano -> px dell'immagine -> px del piano
+        for v, atteso in zip(riga["box_px"], (300, 400, 380, 420)):
+            self.assertAlmostEqual(v, atteso, delta=2)
+
 
 if __name__ == "__main__":
     unittest.main()

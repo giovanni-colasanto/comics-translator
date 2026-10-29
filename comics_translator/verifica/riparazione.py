@@ -303,7 +303,9 @@ def applica_operazioni(officina, spec, dati, dpi_per_pagina):
                     if op.get("residuo") not in residui:
                         raise ValueError("residuo sconosciuto")
                     numero, residuo = residui[op["residuo"]]
-                    box = _px(residuo["box_pt"], officina.scala(numero))
+                    # `dati` porta il riquadro in pixel dell'immagine esportata
+                    k = officina.scala(numero) * dpi_per_pagina[numero] / 72.0
+                    box = [v / k for v in residuo["box"]]
                     inglese = residuo["testo"]
                 else:
                     numero = int(op.get("pagina"))
