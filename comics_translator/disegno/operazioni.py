@@ -291,6 +291,11 @@ class Officina:
         inv = page["sorgente"]
         scala = self.scala(numero)
         rid = "p%d-l%s" % (numero, hashlib.sha256(seme.encode("utf-8")).hexdigest()[:18])
+        if any(r["id"] == rid for r in inv["righe"]):
+            # Stesso seme = stessa operazione gia' fatta (la riparazione la
+            # ripete al giro dopo): una riga doppia rompe la struttura della
+            # pagina e con lei tutta la riparazione (12-doom-owud-2).
+            raise ValueError("riga gia' presente: operazione ripetuta")
         box_px = [float(v) for v in box_px]
         box_pt = [round(v * scala, 6) for v in box_px]
         quad_px = [[box_px[0], box_px[1]], [box_px[2], box_px[1]],

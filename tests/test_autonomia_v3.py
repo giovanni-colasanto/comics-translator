@@ -194,6 +194,17 @@ class RiparazioneTest(unittest.TestCase):
         self.assertEqual(len(scartate), 2)
         self.assertEqual(blocco["testo"], "CIAO A TUTTI")
 
+    def test_un_nuovo_ripetuto_si_scarta_e_la_pagina_resta_valida(self):
+        built, officina, _ = self._officina()
+        dati = [riparazione._dati_pagina(officina, 1, [], 72)]
+        op = {"op": "nuovo", "pagina": 1, "box": [300, 400, 380, 420], "testo": "BORSA"}
+        fatte, scartate = riparazione.applica_operazioni(
+            officina, {"operazioni": [op, dict(op)]}, dati, {1: 72})
+        self.assertEqual((len(fatte), len(scartate)), (1, 1))
+        officina.sigilla([1])
+        loc.enforce_localization(built)
+        sources.validate_sources(built)
+
     def test_traduci_residuo_usa_il_riquadro_dell_immagine(self):
         built, officina, _ = self._officina()
         scala = officina.scala(1)
