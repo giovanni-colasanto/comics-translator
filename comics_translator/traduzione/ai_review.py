@@ -126,23 +126,39 @@ Come lavorare:
   balloon pieno di caratteri minuscoli si legge male quanto una battuta
   tradotta male.
 
+Cosa resta in inglese e cosa no (vale per tutti gli albi, sempre uguale):
+- restano in originale, con `natura: grafica`: loghi e testate, crediti e firme
+  (autori, disegnatori, editor, copertine variant), avvisi legali, onomatopee e
+  suoni disegnati, insegne e scritte dipinte nella scena, testo specchiato o
+  illeggibile, codici e numeri di catalogo;
+- si traducono sempre, con `natura: didascalia`: riassunti iniziali
+  ("PREVIOUSLY..."), titoli di capitolo e di storia, "NEXT:", "TO BE
+  CONTINUED", "THE END", le scritte dei notiziari e dei bug TV ("LIVE" ->
+  "IN DIRETTA"), luoghi e tempi ("NOW.", "GATEWAY CITY."), lettere e rubriche.
+
 Oltre al testo puoi correggere il lavoro dell'algoritmo, che raggruppa i blocchi
 guardando solo i pixel:
-- `salta: true` se quel testo NON va sostituito (onomatopee e scritte che fanno
-  parte del disegno: coprirle rovinerebbe la tavola);
+- `salta: true` SOLO se quel testo NON va sostituito (onomatopee e scritte che
+  fanno parte del disegno: coprirle rovinerebbe la tavola). Mai su un blocco
+  `dialogo` o `didascalia`: un dialogo saltato resta in inglese sulla pagina;
 - `unisci_con: "<id>"` se due blocchi sono in realta' lo stesso balloon spezzato
   in due e sono visivamente adiacenti; il testo verra' fuso nell'altro blocco.
   Ogni blocco deve contenere solo la propria parte: NON copiare anche il testo
   del vicino nella traduzione, altrimenti la fusione lo duplica.
   Non unire mai colonne, titoli, sottotitoli, indici o paragrafi distinti;
-- se un singolo blocco comprende piu' balloon o lobi collegati, usa `salta: true`:
-  il renderer non puo' distribuire il testo fra aree distinte;
+- se un singolo blocco comprende piu' balloon o lobi, NON saltarlo: traduci
+  tutto, nell'ordine di lettura, chiudendo la parte di ogni balloon con la sua
+  punteggiatura (una frase o piu' per balloon, come nell'originale). Il
+  programma divide il testo fra i balloon contando le frasi: non unire in una
+  frase sola battute che stanno in balloon diversi;
 - `corpo: <numero>` per forzare il corpo del carattere, se serve;
 - `allinea: "centro"` o `"sinistra"`.
 
-Se l'immagine non permette di ricostruire con sicurezza un frammento OCR, usa
-`salta: true`: e' meglio lasciare intatta una piccola scritta originale che
-inventare testo o coprire grafica con una traduzione incompleta.
+Se l'OCR ha letto male un frammento, ricostruiscilo guardando l'immagine: il
+balloon e' li', e lo leggi meglio dell'OCR. Se una parola resta davvero
+illeggibile anche nell'immagine, traduci il resto della battuta senza
+inventare quella parola: una battuta tradotta quasi tutta vale piu' di una
+battuta lasciata in inglese.
 
 Scrivi `%(out)s` con la STESSA struttura di `piano.json`, ma includendo per ogni
 blocco solo i campi: `id`, `testo`, `salta`, `unisci_con`, `corpo`, `allinea`,

@@ -45,8 +45,16 @@ NATURE_DA_DISEGNARE = ("dialogo", "didascalia")
 # traduzione che non entra, una decisione presa da qualcuno. Qui non si toccano.
 PROTEZIONI_NON_GEOMETRICHE = (
     "compound", "contenuto_in", "page_protected", "testo_illeggibile",
-    "unreviewed", "salta_deciso", "sbloccato_a_mano",
+    "unreviewed", "sbloccato_a_mano",
 )
+
+# Il salto deciso dal modello su un blocco che lo stesso modello chiama
+# dialogo o didascalia, e che ha tradotto davvero, non e' una scelta sulla
+# tavola: e' il residuo del vecchio prompt ("piu' lobi o frammento incerto ->
+# salta"). Sugli ultimi 20 albi FATTO erano 182 dei 424 sblocchi fatti a mano,
+# la prima causa di lavoro manuale. Entra nello sblocco con le stesse prove di
+# area degli altri; un `salta` deciso su grafica o rumore resta com'e'.
+SALTO_DEL_MODELLO = "salta_deciso"
 
 # Righe che non difendono inchiostro da lettore: nessun testo riconosciuto, o
 # un'altra lettura della stessa zona che il blocco sta riscrivendo.
@@ -86,7 +94,8 @@ def candidato(block, page=None) -> bool:
         return False
     divisibile = compound_divisibile(block, page)
     if not (render.get("source_conflict") or render.get("skip_localizzazione")
-            or render.get("scartato_come_disegno") or divisibile):
+            or render.get("scartato_come_disegno") or render.get(SALTO_DEL_MODELLO)
+            or divisibile):
         return False
     protezioni = [k for k in PROTEZIONI_NON_GEOMETRICHE if render.get(k)]
     if divisibile:
@@ -195,6 +204,79 @@ def _motivo_riga_non_sicura(page, block, ident, disegnati):
     return "riga_esterna:%s" % ident
 
 
+def _box_righe_proprie(page, block):
+    righe = {r["id"]: r for r in ((page or {}).get("sorgente") or {}).get("righe", [])}
+    return [list(righe[i]["box_px"]) for i in (block.get("sorgente") or {}).get("righe", [])
+            if i in righe and righe[i].get("box_px")]
+
+
+# Motivi di rifiuto per cui la banda e' la risposta dei `.finale`: la maschera
+# del balloon toccava un vicino, una riga esterna o un fondo disegnato. Coprire
+# i SOLI rettangoli delle righe proprie con il colore del fondo non tocca nessuno
+# dei tre, e l'inglese non resta. Sugli ultimi 20 albi FATTO: 68 vicini in
+# originale, 50 fondi disegnati, 38 righe esterne, tutti chiusi a mano cosi'.
+MOTIVI_PER_BANDA = ("vicino_in_originale", "riga_esterna", "fondo_disegnato")
+
+
+def _banda_tocca(page, block, disegnati):
+    """Il motivo per cui anche la banda toccherebbe inchiostro altrui, o None."""
+    from comics_translator.disegno.operazioni import rettangoli
+
+    inventario = page.get("sorgente") or {}
+    righe = {r["id"]: r for r in inventario.get("righe", [])}
+    zone = {z["riga"]: z for z in (inventario.get("localizzazione") or {}).get("aree", [])}
+    proprie = set((block.get("sorgente") or {}).get("righe") or [])
+    banda = {"fill_poly": rettangoli(_box_righe_proprie(page, block))}
+    for ident, riga in righe.items():
+        if ident in proprie or riga.get("motivo") in RIGHE_SENZA_ARTE:
+            continue
+        box = riga.get("box_px")
+        if not box or len(box) != 4:
+            continue
+        proprietario = (zone.get(ident) or {}).get("blocco")
+        if proprietario is not None and proprietario in disegnati:
+            continue
+        if quota_coperta(box, banda) >= QUOTA_RIGA_TOCCATA:
+            return ("vicino_in_originale:%s" % proprietario if proprietario
+                    else "riga_esterna:%s" % ident)
+    return None
+
+
+def sblocca_con_banda(plan, officina, decisioni) -> list[dict]:
+    """Dopo lo sblocco: i rifiutati per area si disegnano su una banda.
+
+    Solo dialogo e didascalia con una traduzione vera, solo se i rettangoli
+    delle righe proprie non toccano righe di blocchi lasciati in originale.
+    Cambia le decisioni sul posto (`esito: banda`) e le restituisce.
+    """
+    per_id = {b["id"]: (p, b) for p in plan.get("pagine", [])
+              for b in p.get("blocchi", []) if isinstance(b, dict)}
+    for decisione in decisioni:
+        if decisione.get("esito") != "resta_saltato":
+            continue
+        motivo = (decisione.get("motivo") or "").split(":")[0]
+        if motivo not in MOTIVI_PER_BANDA:
+            continue
+        page, block = per_id[decisione["id"]]
+        if not block.get("salta") or not _box_righe_proprie(page, block):
+            continue
+        disegnati = {b["id"] for b in page.get("blocchi", [])
+                     if isinstance(b, dict) and not b.get("salta")}
+        tocca = _banda_tocca(page, block, disegnati)
+        if tocca:
+            decisione["motivo_banda"] = tocca
+            continue
+        officina.banda(block["id"], "banda", "rifiutato per %s" % decisione["motivo"])
+        decisione["esito"] = "banda"
+    if any(d.get("esito") == "banda" for d in decisioni):
+        localization.enforce_localization(plan)
+        for decisione in decisioni:
+            if decisione.get("esito") == "banda" and per_id[decisione["id"]][1].get("salta"):
+                decisione["esito"] = "resta_saltato"
+                decisione["motivo"] = "banda_revocata_dal_ricalcolo"
+    return decisioni
+
+
 def sblocca_tradotti(plan) -> list[dict]:
     """Sblocca i blocchi che superano entrambe le prove; restituisce le decisioni.
 
@@ -237,6 +319,16 @@ def sblocca_tradotti(plan) -> list[dict]:
                 if render.pop("compound", None):
                     # resta scritto perche' era saltato: le aree si scrivono per lobi
                     render["compound_per_lobi"] = True
+                if render.pop(SALTO_DEL_MODELLO, None):
+                    render["sbloccato_auto"] += "; salto del modello revocato"
+                if not [p for p in render.get("fill_poly") or [] if len(p) >= 3]:
+                    # Saltato dall'origine, senza riempimento: senza i
+                    # rettangoli delle righe l'inglese resterebbe sotto.
+                    boxes = _box_righe_proprie(page, block)
+                    if boxes:
+                        from comics_translator.disegno.operazioni import rettangoli, unione
+                        render["fill_poly"] = rettangoli(boxes)
+                        render["box_px"] = unione([render["box_px"]] + boxes)
                 block["salta"] = False
                 decisioni.append({"pagina": page.get("numero"), "id": bid,
                                   "esito": "sbloccato", "natura": block.get("natura")})

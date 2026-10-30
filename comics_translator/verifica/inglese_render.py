@@ -27,6 +27,8 @@ import re
 import sys
 from pathlib import Path
 
+from comics_translator.verifica import da_lasciare
+
 try:
     import pymupdf as fitz
 except ImportError:  # pragma: no cover
@@ -253,8 +255,15 @@ def righe_inglesi(img, dpi, pagina_piano=None, ocr=None, min_conf=CONFIDENZA_MIN
         box = [riga.x0 * scala, riga.y0 * scala, riga.x1 * scala, riga.y1 * scala]
         cx, cy = (box[0] + box[2]) / 2, (box[1] + box[3]) / 2
         dichiarata = any(r[0] <= cx <= r[2] and r[1] <= cy <= r[3] for r in saltati)
-        trovate.append({"testo": riga.text[:120], "box_pt": [round(v, 1) for v in box],
-                        "confidenza": round(float(riga.conf), 3), "dichiarata": dichiarata})
+        # Crediti, avvisi legali, marchi e onomatopee restano in inglese per
+        # regola (`da_lasciare`): dichiarati, non residui da riparare.
+        convenzione = da_lasciare.motivo(riga.text)
+        voce = {"testo": riga.text[:120], "box_pt": [round(v, 1) for v in box],
+                "confidenza": round(float(riga.conf), 3),
+                "dichiarata": dichiarata or bool(convenzione)}
+        if convenzione:
+            voce["convenzione"] = convenzione
+        trovate.append(voce)
     return trovate
 
 

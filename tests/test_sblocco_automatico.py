@@ -155,10 +155,36 @@ class SbloccoNegativoTest(unittest.TestCase):
         self.assertEqual(sblocco.sblocca_tradotti(built), [])
         self.assertTrue(blocco["salta"])
 
-    def test_una_decisione_presa_non_si_scavalca(self):
+    def test_una_decisione_presa_su_grafica_non_si_scavalca(self):
+        built = self._residuo_dentro()
+        blocco = blocchi(built)[0]
+        blocco["natura"] = "grafica"
+        blocco["_render"]["salta_deciso"] = True
+        self.assertEqual(sblocco.sblocca_tradotti(built), [])
+
+    def test_il_salto_del_modello_su_un_dialogo_tradotto_si_revoca(self):
+        """182 dei 424 sblocchi manuali degli ultimi 20 FATTO: dialogo, tradotto,
+        saltato dal modello per il vecchio prompt ("piu' lobi -> salta")."""
         built = self._residuo_dentro()
         blocco = blocchi(built)[0]
         blocco["natura"] = "dialogo"
+        blocco["_render"]["salta_deciso"] = True
+
+        decisioni = sblocco.sblocca_tradotti(built)
+
+        self.assertEqual([d["esito"] for d in decisioni], ["sbloccato"])
+        self.assertFalse(blocco["salta"])
+        self.assertNotIn("salta_deciso", blocco["_render"])
+        self.assertIn("salto del modello revocato", blocco["_render"]["sbloccato_auto"])
+        sources.validate_sources(built)
+        loc.enforce_localization(built)
+        self.assertFalse(blocco["salta"])
+
+    def test_il_salto_del_modello_senza_traduzione_resta(self):
+        built = self._residuo_dentro()
+        blocco = blocchi(built)[0]
+        blocco["natura"] = "dialogo"
+        blocco["testo"] = blocco["originale"]
         blocco["_render"]["salta_deciso"] = True
         self.assertEqual(sblocco.sblocca_tradotti(built), [])
 

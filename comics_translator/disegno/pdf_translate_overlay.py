@@ -24,6 +24,7 @@ from __future__ import annotations
 
 import argparse
 import concurrent.futures as cf
+import copy
 import hashlib
 import json
 import os
@@ -889,22 +890,56 @@ def render_plan(source_pdf, plan, pages, fonts, args, out_path) -> list[int]:
     return selected
 
 
-def esegui_sblocco_automatico(plan):
+def esegui_sblocco_automatico(plan, source_pdf=None, banda=True, dividi=True, ritocca=True):
     """Disegna i blocchi protetti che il modello ha tradotto e l'area permette.
 
     Vedi `comics_translator.disegno.sblocco_automatico`: e' lo `sblocca` dei `.finale`
     fatto con la natura detta dal modello e le righe vicine verificate. Anche i
     rifiuti vanno nel registro, con il motivo: sono il punto da cui guardare.
+
+    Con la sorgente a disposizione si fanno altri due gesti dei `.finale`: i
+    rifiutati per area vanno su una banda del colore del fondo, e i blocchi che
+    tengono due balloon separati si dividono in un blocco per balloon.
+    Infine i `ritocchi`: banda per i balloon dalla forma dubbia e copertura
+    delle righe doppie dell'OCR che sporgono dai blocchi disegnati.
     """
+    from comics_translator.disegno import dividi_balloon, ritocchi
+    from comics_translator.disegno.operazioni import Officina
+
     decisioni = sblocco_automatico.sblocca_tradotti(plan)
+    officina = Officina(plan, source_pdf)
+    try:
+        if banda:
+            sblocco_automatico.sblocca_con_banda(plan, officina, decisioni)
+        divisi = dividi_balloon.dividi_piano(officina) if dividi and source_pdf else []
+        # Dopo la divisione, sui blocchi definitivi: prima la forma (la banda
+        # rifa' il riempimento), poi le righe doppie che sporgono da quello.
+        forme = ritocchi.bande_per_forme_dubbie(officina) if ritocca else []
+        doppie = ritocchi.copri_righe_doppie(officina) if ritocca else []
+        if officina.toccati:
+            officina.sigilla(sorted({officina.pagina_di[t["id"]]["numero"]
+                                     for t in officina.toccati
+                                     if t["id"] in officina.pagina_di}))
+            localization.enforce_localization(plan)
+    finally:
+        officina.chiudi()
     sbloccati = [d for d in decisioni if d["esito"] == "sbloccato"]
-    rifiutati = [d for d in decisioni if d["esito"] != "sbloccato"]
+    bande = [d for d in decisioni if d["esito"] == "banda"]
+    rifiutati = [d for d in decisioni if d["esito"] == "resta_saltato"]
     status.event("sblocco_automatico",
                  sbloccati=[d["id"] for d in sbloccati],
-                 rifiutati=[{"id": d["id"], "motivo": d.get("motivo")} for d in rifiutati])
-    if decisioni:
-        print("  sblocco automatico: %d blocchi protetti ora disegnati, %d restano "
-              "saltati per l'area" % (len(sbloccati), len(rifiutati)))
+                 bande=[d["id"] for d in bande],
+                 divisi=[{"id": d["id"], "balloon": d["balloon"],
+                          "testo_diviso_per": d.get("testo_diviso_per")} for d in divisi],
+                 forme_dubbie=forme, righe_doppie=doppie,
+                 rifiutati=[{"id": d["id"], "motivo": d.get("motivo"),
+                             "motivo_banda": d.get("motivo_banda")} for d in rifiutati])
+    if decisioni or divisi or forme or doppie:
+        print("  sblocco automatico: %d blocchi protetti ora disegnati, %d su banda, "
+              "%d divisi per balloon, %d restano saltati per l'area; "
+              "%d forme dubbie su banda, %d blocchi con righe doppie coperte"
+              % (len(sbloccati), len(bande), len(divisi), len(rifiutati),
+                 len(forme), len(doppie)))
     return decisioni
 
 
@@ -1171,6 +1206,39 @@ def run_visual_qa(source_pdf, out_path, plan, pages, fonts, args):
     return corrected
 
 
+def esegui_riparazione(source_pdf, out_path, plan, pages, fonts, args, workdir):
+    """Rilegge il PDF finito e ripara l'inglese rimasto (vedi verifica/riparazione).
+
+    Un guasto della riparazione non butta via la traduzione: il PDF resta
+    quello di prima, e il guasto si dichiara.
+    """
+    from comics_translator.verifica import riparazione
+
+    def rendi(piano):
+        render_plan(source_pdf, piano, pages, fonts, args, out_path)
+
+    ai = args.riparazione_ai or args.review_ai
+    model = args.riparazione_model or (args.review_model if ai == args.review_ai else None)
+    lavoro = Path(workdir) / "riparazione"
+    # La riparazione lavora sul piano in place: se cade a meta' si torna a
+    # questo, che corrisponde al PDF di prima.
+    copia_prima = copy.deepcopy(plan)
+    try:
+        plan, _ = riparazione.ripara(
+            source_pdf, out_path, plan, pages, rendi, lavoro, ai=ai, model=model,
+            timeout=args.review_timeout, giri=max(1, args.riparazione_giri),
+            batch=args.review_batch)
+    except Exception as exc:  # la traduzione fatta vale piu' della riparazione
+        status.event("riparazione_fallita", errore=str(exc))
+        print("  ! riparazione non eseguita: %s" % exc, file=sys.stderr)
+        pre = out_path.with_name(out_path.stem + ".pre-riparazione.pdf")
+        if pre.is_file():
+            out_path.write_bytes(pre.read_bytes())
+        return copia_prima
+    save_plan(Path(workdir) / "piano.riparato.json", plan)
+    return plan
+
+
 def build_requested_outputs(source_pdf, out_path, args) -> None:
     """Genera gli output derivati soltanto dopo l'ultimo rendering."""
     if not args.dual:
@@ -1256,6 +1324,20 @@ def main():
                      help="non disegna i blocchi protetti che il modello ha tradotto e "
                           "classificato come dialogo/didascalia, anche se l'area e' sicura")
     rev.set_defaults(sblocco_auto=True)
+    rev.add_argument("--no-riparazione", dest="riparazione", action="store_false",
+                     help="non esegue il ciclo di riparazione dell'inglese rimasto sul PDF "
+                          "finito (default: attivo con --ai-review)")
+    rev.set_defaults(riparazione=None)
+    rev.add_argument("--riparazione-giri", dest="riparazione_giri", type=int, default=2,
+                     metavar="N", help="giri massimi di riparazione (rilettura e ridisegno)")
+    rev.add_argument("--riparazione-ai", dest="riparazione_ai", default=None,
+                     choices=list(ai_review.AI_SUPPORTATE),
+                     help="provider della riparazione (default: quello della traduzione)")
+    rev.add_argument("--riparazione-model", dest="riparazione_model", default=None,
+                     help="modello della riparazione (default: quello della traduzione)")
+    rev.add_argument("--ripara", action="store_true",
+                     help="con --plan-in: rifa' sblocco, bande, divisione per balloon e "
+                          "riparazione su un piano gia' tradotto, senza ritradurre")
     rev.add_argument("--qa-ai", dest="qa_ai", default=None,
                      choices=list(ai_review.AI_SUPPORTATE),
                      help="provider DIVERSO per il QA visuale (default: lo stesso della "
@@ -1290,6 +1372,8 @@ def main():
         args.visual_qa = args.ai_review
     if args.audit_ocr is None:
         args.audit_ocr = args.ai_review
+    if args.riparazione is None:
+        args.riparazione = args.ai_review or args.ripara
 
     if not args.input.is_file():
         sys.exit("File non trovato: %s" % args.input)
@@ -1334,9 +1418,18 @@ def main():
         plan = load_plan(args.plan_in)
         print("Piano caricato da %s: %d pagine." % (args.plan_in, len(pages)))
         doc.close()
+        if args.ripara:
+            localization.enforce_localization(plan)
+            if args.sblocco_auto:
+                esegui_sblocco_automatico(plan, source_pdf)
         pages = render_plan(source_pdf, plan, pages, fonts, args, out_path)
         plan = run_visual_qa(source_pdf, out_path, plan, pages, fonts, args)
+        if args.ripara and args.riparazione:
+            workdir = Path(args.review_dir) if args.review_dir else out_path.with_suffix(".revisione")
+            plan = esegui_riparazione(source_pdf, out_path, plan, pages, fonts, args, workdir)
         build_requested_outputs(source_pdf, out_path, args)
+        if args.ripara:
+            esegui_audit_struttura(source_pdf, out_path, plan, args, report)
         status.record_coverage(plan, render_only=True)
         return finish_translation(report)
 
@@ -1462,7 +1555,7 @@ def main():
         print("  %d campi rivisti" % changed)
         localization.enforce_localization(plan)
         if args.sblocco_auto:
-            esegui_sblocco_automatico(plan)
+            esegui_sblocco_automatico(plan, source_pdf)
         segnala_traduzioni_soppresse(plan)
         segnala_traduzioni_copiate(plan)
         segnala_dialogo_protetto(plan)
@@ -1487,6 +1580,8 @@ def main():
     doc.close()
     pages = render_plan(source_pdf, plan, pages, fonts, args, out_path)
     plan = run_visual_qa(source_pdf, out_path, plan, pages, fonts, args)
+    if args.ai_review and args.riparazione:
+        plan = esegui_riparazione(source_pdf, out_path, plan, pages, fonts, args, workdir)
     build_requested_outputs(source_pdf, out_path, args)
     esegui_audit_struttura(source_pdf, out_path, plan, args, report)
     if not args.visual_qa:
