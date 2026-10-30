@@ -16,10 +16,14 @@ cornice della vignetta fonde le componenti: si resta a un blocco, cioe' al
 comportamento di prima.
 
 La traduzione si divide contando le frasi, come per i lobi; se i conti non
-tornano non si divide (lo fara' il ciclo di riparazione, che chiede al modello).
+tornano si taglia a fine frase secondo la lunghezza (`dividi_per_quota`), ma
+solo se ogni gruppo inglese chiude la sua battuta. Altrimenti non si divide
+(lo fara' il ciclo di riparazione, che chiede al modello).
 """
 
 from __future__ import annotations
+
+import re
 
 import numpy as np
 
@@ -38,7 +42,6 @@ MARGINE = 220
 
 
 def _normalizza(testo):
-    import re
     return re.sub(r"[\W_]+", "", testo or "").casefold()
 
 
@@ -185,6 +188,67 @@ def dividi_testo(testi_originali, traduzione):
     return parti if all(parti) else None
 
 
+# Un gruppo che non finisce con una chiusa (punto, puntini, trattino) taglia
+# una battuta a meta': quasi sempre e' la coda del balloon presa per un lobo
+# ("I'M NOT FOLLOWING YOUR" / "ORDERS LIKE LAST TIME."), e non si divide.
+_CHIUSA = re.compile(r"(?:[.!?…]|-|—)[\"'»”’)*]*\s*$")
+# Peso di una frase di scarto fra il conto inglese e il taglio, rispetto alla
+# quota di lunghezza: tiene "Oh, no!" nel lobo di "OH NO!" (spidey-63-13 p6).
+PESO_CONTO = 0.1
+# Oltre questo scarto fra la quota italiana e quella inglese di un gruppo il
+# taglio non e' credibile.
+SCARTO_QUOTA = 0.25
+
+
+def dividi_per_quota(testi_originali, traduzione):
+    """Ripiego di `dividi_testo` quando il conto delle frasi non torna.
+
+    Sui 5 albi della prova v3 erano 41 blocchi riconosciuti a due balloon e
+    nessuno diviso: il modello unisce o spezza le frasi ("MIREL. TAKE JACOB" ->
+    "Mirel, prendi Jacob"). Ogni gruppo deve chiudere la sua battuta; si taglia
+    alla fine frase italiana piu' vicina alla quota di lunghezza dell'inglese.
+    Nei `.finale` erano le divisioni fatte a mano ("lobo", "balloon spezzato").
+    """
+    if len(testi_originali) < 2:
+        return None
+    if not all(_CHIUSA.search(t.strip()) for t in testi_originali[:-1]):
+        return None
+    frasi = lobi.frasi(traduzione)
+    k = len(testi_originali)
+    if len(frasi) < k:
+        return None
+    pesi = [len(_normalizza(t)) for t in testi_originali]
+    totale = float(sum(pesi))
+    lunghezze = [len(f) for f in frasi]
+    totale_it = float(sum(lunghezze))
+    if not totale or not totale_it:
+        return None
+    attese = [len(lobi.frasi(t, ocr=True)) for t in testi_originali]
+    tagli, quota, conto, prec = [], 0.0, 0, 0
+    for g in range(k - 1):
+        quota += pesi[g] / totale
+        conto += attese[g]
+        migliore = None
+        accumulo = sum(lunghezze[:prec])
+        for j in range(prec + 1, len(frasi) - (k - 2 - g)):
+            accumulo += lunghezze[j - 1]
+            costo = abs(accumulo / totale_it - quota) + PESO_CONTO * abs(j - conto)
+            if migliore is None or costo < migliore[0]:
+                migliore = (costo, j)
+        if migliore is None:
+            return None
+        tagli.append(migliore[1])
+        prec = migliore[1]
+    parti, i = [], 0
+    for t in tagli + [len(frasi)]:
+        parti.append(" ".join(frasi[i:t]).strip())
+        i = t
+    for parte, peso in zip(parti, pesi):
+        if abs(len(parte) / totale_it - peso / totale) > SCARTO_QUOTA:
+            return None
+    return parti if all(parti) else None
+
+
 def candidato(block):
     render = block.get("_render") or {}
     if render.get("tipo") != "immagine" or block.get("natura") not in NATURE:
@@ -218,6 +282,10 @@ def dividi_piano(officina) -> list[dict]:
                 continue
             testi = [" ".join(righe[ids[i]]["testo_normalizzato"] for i in g) for g in gruppi]
             parti = dividi_testo(testi, block["testo"])
+            modo = "frasi"
+            if parti is None:
+                parti = dividi_per_quota(testi, block["testo"])
+                modo = "quota"
             if parti is None:
                 block["_render"]["balloon_separati"] = len(gruppi)
                 continue
@@ -237,5 +305,5 @@ def dividi_piano(officina) -> list[dict]:
             if block["id"] in officina.blocchi:
                 render["diviso_in"] = nuovi
             fatti.append({"pagina": numero, "id": block["id"], "balloon": len(gruppi),
-                          "nuovi": nuovi})
+                          "nuovi": nuovi, "testo_diviso_per": modo})
     return fatti

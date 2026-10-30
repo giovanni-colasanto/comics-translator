@@ -11,7 +11,7 @@ import unittest
 import cv2
 import numpy as np
 
-from comics_translator.disegno import dividi_balloon
+from comics_translator.disegno import dividi_balloon, ritocchi
 from comics_translator.disegno import sblocco_automatico as sblocco
 from comics_translator.disegno.operazioni import Officina, rettangoli
 from comics_translator.sorgente import source_inventory as sources
@@ -90,6 +90,32 @@ class DivisionePerBalloonTest(unittest.TestCase):
             ["Sono qui. Io--", "Se lo dico, e' pronto."])
         self.assertIsNone(dividi_balloon.dividi_testo(["ONE. TWO.", "THREE."], "Uno e due e tre."))
 
+    def test_se_le_frasi_non_tornano_si_taglia_per_quota(self):
+        # captain-america-2025-7 p20: il modello fonde "MIREL." nella frase dopo
+        originali = ["MIREL.TAKE JACOB ANDCLOSE YOURSELFINHIS ROOM.",
+                     "IFYOUHEAR FIGHTING INSIDE THEHOUSE,HEAD OUT THEWINDOWTOA NEIGHBOR'S."]
+        traduzione = ("Mirel, prendi Jacob e chiuditi con lui in camera sua. Se senti che si "
+                      "combatte in casa, uscite dalla finestra e andate da un vicino.")
+        self.assertIsNone(dividi_balloon.dividi_testo(originali, traduzione))
+        self.assertEqual(dividi_balloon.dividi_per_quota(originali, traduzione), [
+            "Mirel, prendi Jacob e chiuditi con lui in camera sua.",
+            "Se senti che si combatte in casa, uscite dalla finestra e andate da un vicino."])
+
+    def test_il_conto_delle_frasi_tiene_la_battuta_breve_nel_suo_lobo(self):
+        # spidey-63-13 p6: per la sola lunghezza "Oh, no!" finiva nel primo lobo
+        parti = dividi_balloon.dividi_per_quota(
+            ["IAPPRECIATE THIS DOCTOR!IFYOUCAN HELPME,I-",
+             "OHNO!WHATAMISTAKE IALMOSTMADE!IFI JUSTRELAXANDSAY WHATEVERITHINKOF"],
+            "La ringrazio, dottore! Se può aiutarmi, io... Oh, no! Stavo per fare un "
+            "grosso errore! Se mi rilasso e dico tutto ciò che penso")
+        self.assertEqual(parti[0], "La ringrazio, dottore! Se può aiutarmi, io...")
+
+    def test_un_gruppo_a_meta_frase_non_si_divide(self):
+        # la coda del balloon presa per un lobo: il primo gruppo non chiude
+        self.assertIsNone(dividi_balloon.dividi_per_quota(
+            ["I'MNOTA SOLDIERHERE, GENERAL.I'M NOT FOLLOWINGYOUR", "ORDERSLIKE LAST TIME."],
+            "Non sono qui come soldato, generale. Non seguirò i tuoi ordini come l'altra volta."))
+
 
 class OperazioniTest(unittest.TestCase):
     def test_banda_disegna_solo_le_righe_proprie(self):
@@ -148,6 +174,72 @@ class SbloccoConBandaTest(unittest.TestCase):
         # da difendere e resta una scelta del chiamante; il filtro vero e'
         # `candidato`, che lo esclude.
         self.assertFalse(sblocco.candidato(blocchi(built)[0], built["pagine"][0]))
+
+
+def _disegnato(built, fill, natura="dialogo"):
+    blocco = blocchi(built)[0]
+    blocco["salta"] = False
+    blocco["natura"] = natura
+    blocco["_render"].pop("source_conflict", None)
+    blocco["_render"]["fill_poly"] = fill
+    return blocco
+
+
+class RigheDoppieTest(unittest.TestCase):
+    def _con_doppia(self, doppia=(20, 26, 80, 46)):
+        built = analyzed([line("HELLO", (20, 20, 80, 32)),
+                          line("HELLO THERE", doppia, reason="recovery_alternative")])
+        blocco = _disegnato(built, rettangoli([[20, 20, 80, 32]], pad=0))
+        return built, blocco
+
+    def test_la_seconda_lettura_che_sporge_si_copre(self):
+        # imperial-guardians-1 p5: «HALA--?» restava sotto «Ma per Hala--?»
+        built, blocco = self._con_doppia()
+        fatti = ritocchi.copri_righe_doppie(Officina(built))
+        self.assertEqual([f["id"] for f in fatti], [blocco["id"]])
+        doppia = built["pagine"][0]["sorgente"]["righe"][1]["box_px"]
+        self.assertGreaterEqual(sblocco.quota_coperta(doppia, blocco["_render"]), 0.9)
+        self.assertEqual(blocco["_render"]["box_px"], [20, 20, 80, 32])
+
+    def test_una_riga_lontana_non_e_una_seconda_lettura(self):
+        built, _ = self._con_doppia(doppia=(20, 60, 80, 76))
+        self.assertEqual(ritocchi.copri_righe_doppie(Officina(built)), [])
+
+    def test_gia_coperta_dal_balloon_non_si_tocca(self):
+        built, blocco = self._con_doppia()
+        blocco["_render"]["fill_poly"] = rettangoli([[18, 18, 82, 48]], pad=0)
+        self.assertEqual(ritocchi.copri_righe_doppie(Officina(built)), [])
+
+
+class FormaDubbiaTest(unittest.TestCase):
+    def _blocco(self, fill, natura="dialogo"):
+        built = analyzed([line("HELLO", (100, 100, 200, 120))])
+        return built, _disegnato(built, fill, natura)
+
+    def test_un_rettangolo_molto_piu_grande_delle_righe_va_su_banda(self):
+        # imperial-guardians-1 p13 e p17: il riempimento squadrato tagliava il bordo
+        built, blocco = self._blocco([[[60, 60], [240, 60], [240, 170], [60, 170]]])
+        fatti = ritocchi.bande_per_forme_dubbie(Officina(built))
+        self.assertEqual([f["id"] for f in fatti], [blocco["id"]])
+        self.assertTrue(blocco["_render"]["banda"])
+        loc.enforce_localization(built)
+        sources.validate_sources(built)
+
+    def test_un_ovale_resta_com_e(self):
+        ovale = cv2.ellipse2Poly((150, 110), (90, 50), 0, 0, 360, 10).tolist()
+        built, blocco = self._blocco([ovale])
+        self.assertEqual(ritocchi.bande_per_forme_dubbie(Officina(built)), [])
+        self.assertFalse(blocco["_render"].get("banda"))
+
+    def test_un_blocco_allargato_dalla_riparazione_non_va_su_banda(self):
+        # imperial-guardians-1 p11: la banda lo stringeva alla sola riga «THE»
+        built, blocco = self._blocco([[[60, 60], [240, 60], [240, 170], [60, 170]]])
+        blocco["_render"]["box_px"] = [40, 40, 400, 300]
+        self.assertEqual(ritocchi.bande_per_forme_dubbie(Officina(built)), [])
+
+    def test_una_didascalia_rettangolare_resta_com_e(self):
+        built, _ = self._blocco([[[60, 60], [240, 60], [240, 170], [60, 170]]], "didascalia")
+        self.assertEqual(ritocchi.bande_per_forme_dubbie(Officina(built)), [])
 
 
 def blocco_righe(built):

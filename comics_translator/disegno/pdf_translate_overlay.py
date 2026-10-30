@@ -890,7 +890,7 @@ def render_plan(source_pdf, plan, pages, fonts, args, out_path) -> list[int]:
     return selected
 
 
-def esegui_sblocco_automatico(plan, source_pdf=None, banda=True, dividi=True):
+def esegui_sblocco_automatico(plan, source_pdf=None, banda=True, dividi=True, ritocca=True):
     """Disegna i blocchi protetti che il modello ha tradotto e l'area permette.
 
     Vedi `comics_translator.disegno.sblocco_automatico`: e' lo `sblocca` dei `.finale`
@@ -900,8 +900,10 @@ def esegui_sblocco_automatico(plan, source_pdf=None, banda=True, dividi=True):
     Con la sorgente a disposizione si fanno altri due gesti dei `.finale`: i
     rifiutati per area vanno su una banda del colore del fondo, e i blocchi che
     tengono due balloon separati si dividono in un blocco per balloon.
+    Infine i `ritocchi`: banda per i balloon dalla forma dubbia e copertura
+    delle righe doppie dell'OCR che sporgono dai blocchi disegnati.
     """
-    from comics_translator.disegno import dividi_balloon
+    from comics_translator.disegno import dividi_balloon, ritocchi
     from comics_translator.disegno.operazioni import Officina
 
     decisioni = sblocco_automatico.sblocca_tradotti(plan)
@@ -910,6 +912,10 @@ def esegui_sblocco_automatico(plan, source_pdf=None, banda=True, dividi=True):
         if banda:
             sblocco_automatico.sblocca_con_banda(plan, officina, decisioni)
         divisi = dividi_balloon.dividi_piano(officina) if dividi and source_pdf else []
+        # Dopo la divisione, sui blocchi definitivi: prima la forma (la banda
+        # rifa' il riempimento), poi le righe doppie che sporgono da quello.
+        forme = ritocchi.bande_per_forme_dubbie(officina) if ritocca else []
+        doppie = ritocchi.copri_righe_doppie(officina) if ritocca else []
         if officina.toccati:
             officina.sigilla(sorted({officina.pagina_di[t["id"]]["numero"]
                                      for t in officina.toccati
@@ -923,13 +929,17 @@ def esegui_sblocco_automatico(plan, source_pdf=None, banda=True, dividi=True):
     status.event("sblocco_automatico",
                  sbloccati=[d["id"] for d in sbloccati],
                  bande=[d["id"] for d in bande],
-                 divisi=[{"id": d["id"], "balloon": d["balloon"]} for d in divisi],
+                 divisi=[{"id": d["id"], "balloon": d["balloon"],
+                          "testo_diviso_per": d.get("testo_diviso_per")} for d in divisi],
+                 forme_dubbie=forme, righe_doppie=doppie,
                  rifiutati=[{"id": d["id"], "motivo": d.get("motivo"),
                              "motivo_banda": d.get("motivo_banda")} for d in rifiutati])
-    if decisioni or divisi:
+    if decisioni or divisi or forme or doppie:
         print("  sblocco automatico: %d blocchi protetti ora disegnati, %d su banda, "
-              "%d divisi per balloon, %d restano saltati per l'area"
-              % (len(sbloccati), len(bande), len(divisi), len(rifiutati)))
+              "%d divisi per balloon, %d restano saltati per l'area; "
+              "%d forme dubbie su banda, %d blocchi con righe doppie coperte"
+              % (len(sbloccati), len(bande), len(divisi), len(rifiutati),
+                 len(forme), len(doppie)))
     return decisioni
 
 
